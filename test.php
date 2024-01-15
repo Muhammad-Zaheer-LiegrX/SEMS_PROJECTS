@@ -20,22 +20,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $doc_type = $_POST['selection'];
 
         foreach ($_POST['marks'] as $student_id => $obtained_marks) {
-            // Get the student name using the student_id
-            $student_name_query = "SELECT Student_full_Name FROM student_bio_data WHERE Studnet_id = '$student_id'";
-            $result_name = $con->query($student_name_query);
+            // Check if the column already exists
+            $check_column_query = "SHOW COLUMNS FROM `instructor_assign_marks` LIKE '$doc_type'";
+            $result_check_column = $con->query($check_column_query);
 
-            if ($result_name && $result_name->num_rows > 0) {
-                $row_name = $result_name->fetch_assoc();
-                $student_name = $row_name['Student_full_Name'];
+            if ($result_check_column->num_rows == 0) {
+                // Column doesn't exist, calculate average and update 'marks' column
+                $calculate_average_query = "SELECT AVG(marks) AS average_marks FROM `instructor_assign_marks` WHERE `student_id` = '$student_id'";
+                $result_average = $con->query($calculate_average_query);
 
-                // Insert the marks into the instructor_assign_marks table
-                $insert_query = "INSERT INTO `instructor_assign_marks` (`student_id`, `student_name`, `exam_type`, `marks`) VALUES ('$student_id', '$student_name', '$doc_type', '$obtained_marks')";
-                
-                if ($con->query($insert_query) !== TRUE) {
-                    $_SESSION['error_message'] = "Error: " . $con->error;
+                if ($result_average && $row_average = $result_average->fetch_assoc()) {
+                    $average_marks = $row_average['average_marks'];
+
+                    // Update the 'marks' column with the calculated average
+                    $update_query = "UPDATE `instructor_assign_marks` SET `marks` = '$average_marks' WHERE `student_id` = '$student_id'";
+                    if ($con->query($update_query) !== TRUE) {
+                        $_SESSION['error_message'] = "Error updating data: " . $con->error;
+                    }
+                } else {
+                    $_SESSION['error_message'] = "Error calculating average marks.";
                 }
             } else {
-                $_SESSION['error_message'] = "Error: Student name not found for student_id: $student_id";
+                // Column exists, update the 'marks' column
+                $update_query = "UPDATE `instructor_assign_marks` SET `marks` = '$obtained_marks' WHERE `student_id` = '$student_id'";
+                if ($con->query($update_query) !== TRUE) {
+                    $_SESSION['error_message'] = "Error updating data: " . $con->error;
+                }
             }
         }
     } else {
@@ -46,6 +56,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit();
 }
 ?>
+
+
 <!DOCTYPE html>
 <html lang="en">
 
@@ -342,4 +354,3 @@ body {
 </body>
 
 </html>
-
